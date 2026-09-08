@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import struct
 import pandas as pd
@@ -854,5 +853,4 @@ if buscar:
                 file_name="registro_modificaciones.csv",
                 mime="text/csv"
             )
-```
 
