@@ -147,7 +147,7 @@ nuevo_km_input = st.number_input(
 # FIJO: 1.000.000 metros
 # ============================================================
 
-margen = 1_100_000
+margen = 2_000_000
 
 st.number_input(
     "Margen de búsqueda en metros",
