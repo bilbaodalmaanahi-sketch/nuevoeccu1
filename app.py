@@ -1,8 +1,8 @@
+```python
 import streamlit as st
 import struct
 import pandas as pd
 import random
-from io import BytesIO
 
 
 # ============================================================
@@ -11,7 +11,7 @@ from io import BytesIO
 
 st.set_page_config(
     page_title="Monky BIN Analyzer by pipi Cabral",
-    page_icon="",
+    page_icon="🐒",
     layout="wide"
 )
 
@@ -100,9 +100,9 @@ input {
 st.title("🐒 MONKY BIN ANALYZER by Pipi Cabral")
 
 st.write(
-    "Busca un valor exacto, realiza un barrido de las tres "
-    "últimas cifras y analiza equivalentes en metros dentro "
-    "de todo el archivo BIN."
+    "Busca un valor exacto en km, realiza un barrido de las "
+    "tres últimas cifras y busca representaciones equivalentes "
+    "en metros dentro de un margen configurable."
 )
 
 
@@ -123,7 +123,7 @@ archivo = st.file_uploader(
 ingrekk = st.number_input(
     "Kilometraje / valor exacto a buscar",
     min_value=0,
-    value=234570,
+    value=282235,
     step=1
 )
 
@@ -147,7 +147,7 @@ nuevo_km = st.number_input(
 margen = st.number_input(
     "Margen de búsqueda en metros",
     min_value=0,
-    value=1_000_000,
+    value=1_200_000,
     step=100_000
 )
 
@@ -187,6 +187,8 @@ if buscar:
 
         objetivo = int(ingrekk)
         nuevo_km = int(nuevo_km)
+        margen = int(margen)
+
 
         # ====================================================
         # RANGO DE LAS 3 ÚLTIMAS CIFRAS
@@ -200,19 +202,28 @@ if buscar:
             rango_inicio + 999
         )
 
+
         # ====================================================
         # OBJETIVO EN METROS
         # ====================================================
 
-        objetivo_metros = objetivo * 1000
+        objetivo_metros = (
+            objetivo * 1000
+        )
+
+
+        # ====================================================
+        # RANGO DE METROS
+        # ====================================================
 
         limite_inicio = (
-            objetivo_metros - int(margen)
+            objetivo_metros - margen
         )
 
         limite_fin = (
-            objetivo_metros + int(margen)
+            objetivo_metros + margen
         )
+
 
         # ====================================================
         # INFORMACIÓN
@@ -231,17 +242,17 @@ if buscar:
 
         col2.metric(
             "Valor buscado",
-            f"{objetivo:,}"
+            f"{objetivo:,} km"
         )
 
         col3.metric(
-            "Rango 3 últimas cifras",
-            f"{rango_inicio:,} → {rango_fin:,}"
+            "Equivalente en metros",
+            f"{objetivo_metros:,} m"
         )
 
         col4.metric(
-            "Objetivo metros",
-            f"{objetivo_metros:,}"
+            "Margen",
+            f"±{margen:,} m"
         )
 
 
@@ -287,7 +298,7 @@ if buscar:
                     "Valor":
                         valor,
 
-                    "Diferencia desde exacto":
+                    "Diferencia desde objetivo":
                         valor - objetivo,
 
                     "Exacto":
@@ -304,6 +315,22 @@ if buscar:
 
             # =================================================
             # BÚSQUEDA POR METROS
+            #
+            # IMPORTANTE:
+            #
+            # El objetivo es 282235 km
+            #
+            # Su equivalente:
+            #
+            # 282235000 metros
+            #
+            # Buscamos alrededor de ese valor.
+            #
+            # Por ejemplo:
+            #
+            # 282334000 metros
+            #
+            # entra en el rango si está dentro del margen.
             # =================================================
 
             if limite_inicio <= valor <= limite_fin:
@@ -312,12 +339,16 @@ if buscar:
                     valor - objetivo_metros
                 )
 
+                diferencia_km = (
+                    diferencia / 1000
+                )
+
                 resultados_metros.append({
 
                     "Dirección":
                         f"0x{direccion:04X}",
 
-                    "Valor":
+                    "Valor BIN":
                         valor,
 
                     "Kilómetros":
@@ -329,7 +360,10 @@ if buscar:
                     "Diferencia (m)":
                         diferencia,
 
-                    "Distancia absoluta":
+                    "Diferencia (km)":
+                        round(diferencia_km, 3),
+
+                    "Distancia absoluta (m)":
                         abs(diferencia),
 
                     "HEX":
@@ -368,12 +402,12 @@ if buscar:
         # ====================================================
 
         st.subheader(
-            "Barrido de las tres últimas cifras"
+            "🔎 Barrido de las tres últimas cifras"
         )
 
         st.write(
             f"Se buscaron todos los valores desde "
-            f"**{rango_inicio:,}** hasta **{rango_fin:,}**."
+            f"**{rango_inicio:,}** hasta **{rango_fin:,} km**."
         )
 
 
@@ -416,7 +450,7 @@ if buscar:
 
 
             st.subheader(
-                f"Valor exacto: {objetivo:,}"
+                f"Valor exacto: {objetivo:,} km"
             )
 
 
@@ -475,13 +509,14 @@ if buscar:
         # ====================================================
 
         st.subheader(
-            "Resultados de búsqueda por metros"
+            "📏 Búsqueda de representación en metros"
         )
 
         st.write(
-            f"Objetivo: **{objetivo_metros:,} metros**  \n"
-            f"Margen: **±{margen:,} metros**  \n"
-            f"Rango: **{limite_inicio:,} → {limite_fin:,} metros**"
+            f"**Kilometraje buscado:** {objetivo:,} km  \n"
+            f"**Equivalente exacto:** {objetivo_metros:,} m  \n"
+            f"**Margen:** ±{margen:,} m  \n"
+            f"**Rango:** {limite_inicio:,} → {limite_fin:,} m"
         )
 
 
@@ -494,18 +529,32 @@ if buscar:
 
         else:
 
+            # -----------------------------------------------
+            # ORDENAR POR DISTANCIA AL OBJETIVO
+            # -----------------------------------------------
+
             resultado_metros = (
                 resultado_metros
                 .sort_values(
-                    "Distancia absoluta"
+                    [
+                        "Distancia absoluta (m)",
+                        "Dirección"
+                    ]
                 )
                 .reset_index(drop=True)
             )
 
+
             st.success(
                 f"Se encontraron "
-                f"{len(resultado_metros)} coincidencias."
+                f"{len(resultado_metros)} candidatos "
+                f"dentro del rango."
             )
+
+
+            # -----------------------------------------------
+            # MOSTRAR TABLA
+            # -----------------------------------------------
 
             st.dataframe(
                 resultado_metros,
@@ -515,19 +564,39 @@ if buscar:
 
 
             # =================================================
-            # MÁS CERCANO
+            # CANDIDATO MÁS CERCANO
             # =================================================
 
             cercano = resultado_metros.iloc[0]
 
+
             st.info(
-                f"Más cercano al objetivo: "
-                f"{cercano['Metros']:,} metros | "
-                f"{cercano['Kilómetros']} km | "
+                f"🎯 Candidato más cercano\n\n"
+                f"Objetivo: **{objetivo_metros:,} m**\n\n"
+                f"Encontrado en BIN: "
+                f"**{cercano['Metros']:,} m**\n\n"
+                f"Equivalente: "
+                f"**{cercano['Kilómetros']} km**\n\n"
                 f"Diferencia: "
-                f"{cercano['Diferencia (m)']:+,} m | "
-                f"Dirección: "
-                f"{cercano['Dirección']}"
+                f"**{cercano['Diferencia (m)']:+,} m** "
+                f"(**{cercano['Diferencia (km)']:+.3f} km**)\n\n"
+                f"Dirección: **{cercano['Dirección']}**"
+            )
+
+
+            # =================================================
+            # SI EL CASO ES 282235 → 282334
+            # =================================================
+
+            diferencia_km_cercano = (
+                cercano["Diferencia (m)"] / 1000
+            )
+
+            st.write(
+                f"### Comparación\n"
+                f"Objetivo: **{objetivo:,} km**  \n"
+                f"Candidato: **{cercano['Kilómetros']} km**  \n"
+                f"Diferencia: **{diferencia_km_cercano:+.3f} km**"
             )
 
 
@@ -536,7 +605,7 @@ if buscar:
         # ====================================================
 
         st.subheader(
-            "Modificación de equivalentes en metros"
+            "⚠️ Modificación de equivalentes en metros"
         )
 
         st.write(
@@ -569,8 +638,6 @@ if buscar:
 
             cantidad = len(direcciones_metros)
 
-            # Si hay hasta 1000 coincidencias intentamos
-            # que cada una tenga un sufijo diferente.
             if cantidad <= 1000:
 
                 sufijos = random.sample(
@@ -606,7 +673,7 @@ if buscar:
 
 
                 # ---------------------------------------------
-                # 280000 + tres cifras
+                # NUEVO VALOR
                 # ---------------------------------------------
 
                 nuevo_valor = (
@@ -625,7 +692,7 @@ if buscar:
 
 
                 # ---------------------------------------------
-                # ESCRIBIR EN COPIA DEL BIN
+                # ESCRIBIR
                 # ---------------------------------------------
 
                 datos_modificados[
@@ -714,6 +781,7 @@ if buscar:
                 )[0]
 
                 if valor_verificado != valor_esperado:
+
                     errores += 1
 
 
@@ -754,7 +822,7 @@ if buscar:
 
 
             # =================================================
-            # DESCARGAR BIN MODIFICADO
+            # DESCARGAR BIN
             # =================================================
 
             st.subheader(
@@ -771,7 +839,7 @@ if buscar:
 
 
             # =================================================
-            # DESCARGAR TABLA DE MODIFICACIONES
+            # DESCARGAR REGISTRO
             # =================================================
 
             csv_modificaciones = (
@@ -786,5 +854,5 @@ if buscar:
                 file_name="registro_modificaciones.csv",
                 mime="text/csv"
             )
-
+```
 
