@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 import struct
 import pandas as pd
 import random
@@ -9,11 +10,10 @@ import random
 # ============================================================
 
 st.set_page_config(
-    page_title="Monky BIN Analyzer by pipi Cabral",
-    page_icon="🐒",
+    page_title="Monky2 BIN Analyzer",
+    page_icon="",
     layout="wide"
 )
-
 
 # ============================================================
 # ESTILO UNDERGROUND
@@ -90,767 +90,371 @@ input {
 
 </style>
 """, unsafe_allow_html=True)
-
-
 # ============================================================
 # TÍTULO
 # ============================================================
 
-st.title("🐒 MONKY BIN ANALYZER by Pipi Cabral")
+st.title("🐒 MONKY EEPROM LAB")
+
+st.markdown(
+    "### ECU / EEPROM Binary Memory Analyzer"
+)
+
+st.caption("Concept by Ariel Calacaterra")
 
 st.write(
-    "Busca un valor exacto en km, realiza un barrido de las "
-    "tres últimas cifras y busca representaciones equivalentes "
-    "en metros dentro de un margen configurable."
+    "Busca un valor exacto, realiza un barrido de las "
+    "tres últimas cifras y busca equivalentes en metros "
+    "dentro de todo el archivo BIN."
 )
 
 
 # ============================================================
-# CARGAR ARCHIVO
+# ARCHIVO BIN
 # ============================================================
 
-archivo = st.file_uploader(
-    "Seleccionar archivo BIN",
+archivo1 = st.file_uploader(
+    "Cargar archivo BIN",
     type=["bin"]
 )
 
+if archivo1 is None:
+    st.info("Seleccione un archivo BIN para comenzar.")
+    st.stop()
+
+
+# Leer BIN cargado por el usuario
+datos = archivo1.read()
+
+print("Tamaño:", len(datos), "bytes")
+
 
 # ============================================================
-# KILOMETRAJE / VALOR A BUSCAR
+# CONSTRUIR DATAFRAME DE 4 BYTES
 # ============================================================
 
-ingrekk = st.number_input(
-    "Kilometraje / valor exacto a buscar",
+filas = []
+
+for direccion in range(0, len(datos) - 3, 4):
+
+    # Leer los 4 bytes como uint32 little-endian
+    valor = struct.unpack_from(
+        "<I",
+        datos,
+        direccion
+    )[0]
+
+    b0 = datos[direccion]
+    b1 = datos[direccion + 1]
+    b2 = datos[direccion + 2]
+    b3 = datos[direccion + 3]
+
+    filas.append({
+        "Direccion_decimal": direccion,
+        "Direccion_HEX": f"0x{direccion:04X}",
+
+        "Valor": valor,
+
+        "HEX": f"0x{valor:08X}",
+
+        "B0": f"{b0:02X}",
+        "B1": f"{b1:02X}",
+        "B2": f"{b2:02X}",
+        "B3": f"{b3:02X}",
+
+        "Bytes": (
+            f"{b0:02X} "
+            f"{b1:02X} "
+            f"{b2:02X} "
+            f"{b3:02X}"
+        )
+    })
+
+
+df_bin = pd.DataFrame(filas)
+
+
+# ============================================================
+# VALORES
+# ============================================================
+
+valor_buscado = st.number_input(
+    "Valor a buscar",
     min_value=0,
     value=282235,
     step=1
 )
 
-
-# ============================================================
-# KILOMETRAJE FIJO PARA REEMPLAZO
-# ============================================================
-
-nuevo_km = st.number_input(
-    "Nuevo kilometraje fijo",
+nuevov = st.number_input(
+    "Nuevo valor",
     min_value=0,
-    value=280000,
+    value=123,
     step=1
 )
 
 
 # ============================================================
-# MARGEN DE METROS
+# BUSCAR VALOR EN EL PRIMER DATAFRAME
 # ============================================================
 
-margen = st.number_input(
-    "Margen de búsqueda en metros",
-    min_value=0,
-    value=1_200_000,
-    step=100_000
+resultado = df_bin[
+    df_bin["Valor"] == valor_buscado
+].copy()
+
+
+st.write(
+    f"Coincidencias encontradas: {len(resultado)}"
+)
+
+st.dataframe(
+    resultado[[
+        "Direccion_decimal",
+        "Direccion_HEX",
+        "Valor",
+        "HEX",
+        "Bytes"
+    ]],
+    use_container_width=True
 )
 
 
 # ============================================================
-# BOTÓN
+# CAMBIAR VALOR EN EL PRIMER DATAFRAME
 # ============================================================
 
-buscar = st.button(
-    "🔎 Buscar y preparar modificación",
-    type="primary"
+df_bin.loc[
+    df_bin["Valor"] == valor_buscado,
+    "Valor"
+] = nuevov
+
+
+# ============================================================
+# CONSTRUIR SEGUNDO DATAFRAME
+# ============================================================
+
+valor_km = valor_buscado
+
+
+# Equivalente en metros
+valor_metros_objetivo = valor_km * 1000
+
+
+# Margen de búsqueda
+margen_metros = 1_100_000
+
+
+limite_metros_inicio = (
+    valor_metros_objetivo - margen_metros
+)
+
+limite_metros_fin = (
+    valor_metros_objetivo + margen_metros
 )
 
 
 # ============================================================
-# PROCESAMIENTO
+# BUSCAR VALORES EN METROS
 # ============================================================
 
-if buscar:
+filas_metros = []
 
-    if archivo is None:
+for direccion in range(0, len(datos) - 3, 4):
 
-        st.warning(
-            "Primero debes cargar un archivo BIN."
-        )
+    valor_metros = struct.unpack_from(
+        "<I",
+        datos,
+        direccion
+    )[0]
 
-    else:
+    # Buscar valores dentro del rango de metros
+    if (
+        limite_metros_inicio
+        <= valor_metros
+        <= limite_metros_fin
+    ):
 
-        # ====================================================
-        # LEER BIN
-        # ====================================================
+        b0 = datos[direccion]
+        b1 = datos[direccion + 1]
+        b2 = datos[direccion + 2]
+        b3 = datos[direccion + 3]
 
-        datos_originales = archivo.read()
-        datos_modificados = bytearray(datos_originales)
+        filas_metros.append({
 
-        tamaño = len(datos_originales)
+            "Direccion_decimal":
+                direccion,
 
-        objetivo = int(ingrekk)
-        nuevo_km = int(nuevo_km)
-        margen = int(margen)
+            "Direccion_HEX":
+                f"0x{direccion:04X}",
 
+            "Metros":
+                valor_metros,
 
-        # ====================================================
-        # RANGO DE LAS 3 ÚLTIMAS CIFRAS
-        # ====================================================
+            "HEX":
+                f"0x{valor_metros:08X}",
 
-        rango_inicio = (
-            objetivo // 1000
-        ) * 1000
+            "B0":
+                f"{b0:02X}",
 
-        rango_fin = (
-            rango_inicio + 999
-        )
+            "B1":
+                f"{b1:02X}",
 
+            "B2":
+                f"{b2:02X}",
 
-        # ====================================================
-        # OBJETIVO EN METROS
-        # ====================================================
+            "B3":
+                f"{b3:02X}",
 
-        objetivo_metros = (
-            objetivo * 1000
-        )
-
-
-        # ====================================================
-        # RANGO DE METROS
-        # ====================================================
-
-        limite_inicio = (
-            objetivo_metros - margen
-        )
-
-        limite_fin = (
-            objetivo_metros + margen
-        )
-
-
-        # ====================================================
-        # INFORMACIÓN
-        # ====================================================
-
-        st.success(
-            f"Archivo cargado correctamente: {archivo.name}"
-        )
-
-        col1, col2, col3, col4 = st.columns(4)
-
-        col1.metric(
-            "Tamaño BIN",
-            f"{tamaño:,} bytes"
-        )
-
-        col2.metric(
-            "Valor buscado",
-            f"{objetivo:,} km"
-        )
-
-        col3.metric(
-            "Equivalente en metros",
-            f"{objetivo_metros:,} m"
-        )
-
-        col4.metric(
-            "Margen",
-            f"±{margen:,} m"
-        )
-
-
-        # ====================================================
-        # LISTAS
-        # ====================================================
-
-        resultados_barrido = []
-        resultados_metros = []
-
-        # Direcciones que serán modificadas
-        direcciones_metros = []
-
-
-        # ====================================================
-        # BARRIDO COMPLETO DEL BIN
-        # ====================================================
-
-        for direccion in range(0, tamaño - 3):
-
-            valor = struct.unpack_from(
-                "<I",
-                datos_originales,
-                direccion
-            )[0]
-
-            bytes_valor = datos_originales[
-                direccion:direccion + 4
-            ]
-
-
-            # =================================================
-            # BÚSQUEDA DEL RANGO DE KM
-            # =================================================
-
-            if rango_inicio <= valor <= rango_fin:
-
-                resultados_barrido.append({
-
-                    "Dirección":
-                        f"0x{direccion:04X}",
-
-                    "Valor":
-                        valor,
-
-                    "Diferencia desde objetivo":
-                        valor - objetivo,
-
-                    "Exacto":
-                        "🔴" if valor == objetivo else "",
-
-                    "HEX":
-                        f"0x{valor:08X}",
-
-                    "Bytes":
-                        bytes_valor.hex(" ").upper()
-
-                })
-
-
-            # =================================================
-            # BÚSQUEDA POR METROS
-            #
-            # IMPORTANTE:
-            #
-            # El objetivo es 282235 km
-            #
-            # Su equivalente:
-            #
-            # 282235000 metros
-            #
-            # Buscamos alrededor de ese valor.
-            #
-            # Por ejemplo:
-            #
-            # 282334000 metros
-            #
-            # entra en el rango si está dentro del margen.
-            # =================================================
-
-            if limite_inicio <= valor <= limite_fin:
-
-                diferencia = (
-                    valor - objetivo_metros
+            "Bytes":
+                (
+                    f"{b0:02X} "
+                    f"{b1:02X} "
+                    f"{b2:02X} "
+                    f"{b3:02X}"
                 )
+        })
 
-                diferencia_km = (
-                    diferencia / 1000
-                )
 
-                resultados_metros.append({
+# ============================================================
+# CREAR DATAFRAME DE METROS
+# ============================================================
 
-                    "Dirección":
-                        f"0x{direccion:04X}",
+df_metros = pd.DataFrame(
+    filas_metros
+)
 
-                    "Valor BIN":
-                        valor,
 
-                    "Kilómetros":
-                        round(valor / 1000, 3),
+# ============================================================
+# MOSTRAR DATAFRAME DE METROS
+# ============================================================
 
-                    "Metros":
-                        valor,
+st.write(
+    f"Equivalente: {valor_metros_objetivo:,} metros"
+)
 
-                    "Diferencia (m)":
-                        diferencia,
+st.write(
+    f"Margen: ±{margen_metros:,} metros"
+)
 
-                    "Diferencia (km)":
-                        round(diferencia_km, 3),
+st.write(
+    f"Rango: "
+    f"{limite_metros_inicio:,} → "
+    f"{limite_metros_fin:,}"
+)
 
-                    "Distancia absoluta (m)":
-                        abs(diferencia),
+st.write(
+    f"Coincidencias: {len(df_metros)}"
+)
 
-                    "HEX":
-                        f"0x{valor:08X}",
+st.dataframe(
+    df_metros,
+    use_container_width=True
+)
 
-                    "Bytes":
-                        bytes_valor.hex(" ").upper()
 
-                })
+# ============================================================
+# ACTUALIZAR VALORES EN METROS
+# ============================================================
 
-                direcciones_metros.append(
-                    direccion
-                )
+df_metros["Metros"] = df_metros["Metros"].apply(
+    lambda x:
+        nuevov * 1000
+        + random.randint(0, 999)
+)
 
 
-        # ====================================================
-        # DATAFRAME BARRIDO
-        # ====================================================
+# ============================================================
+# MOSTRAR NUEVOS VALORES DE METROS
+# ============================================================
 
-        resultado_barrido = pd.DataFrame(
-            resultados_barrido
-        )
+st.write("Nuevos valores en metros")
 
+st.dataframe(
+    df_metros[[
+        "Direccion_decimal",
+        "Direccion_HEX",
+        "Metros",
+        "HEX",
+        "Bytes"
+    ]],
+    use_container_width=True
+)
 
-        # ====================================================
-        # DATAFRAME METROS
-        # ====================================================
+# ============================================================
+# CREAR COPIA MODIFICABLE DEL BIN
+# ============================================================
 
-        resultado_metros = pd.DataFrame(
-            resultados_metros
-        )
+datos_modificados = bytearray(datos)
 
 
-        # ====================================================
-        # RESULTADOS BARRIDO
-        # ====================================================
+# ============================================================
+# ESCRIBIR CAMBIOS DEL PRIMER DATAFRAME
+# ============================================================
 
-        st.subheader(
-            "🔎 Barrido de las tres últimas cifras"
-        )
+for _, fila in resultado.iterrows():
 
-        st.write(
-            f"Se buscaron todos los valores desde "
-            f"**{rango_inicio:,}** hasta **{rango_fin:,} km**."
-        )
+    direccion = int(
+        fila["Direccion_decimal"]
+    )
 
+    nuevo_valor = int(
+        nuevov
+    )
 
-        if resultado_barrido.empty:
+    struct.pack_into(
+        "<I",
+        datos_modificados,
+        direccion,
+        nuevo_valor
+    )
 
-            st.warning(
-                f"No se encontraron valores entre "
-                f"{rango_inicio:,} y {rango_fin:,}."
-            )
 
-        else:
+# ============================================================
+# ESCRIBIR CAMBIOS DEL SEGUNDO DATAFRAME
+# ============================================================
 
-            resultado_barrido = (
-                resultado_barrido
-                .sort_values(
-                    ["Valor", "Dirección"]
-                )
-                .reset_index(drop=True)
-            )
+for _, fila in df_metros.iterrows():
 
-            st.success(
-                f"Se encontraron "
-                f"{len(resultado_barrido)} coincidencias."
-            )
+    direccion = int(
+        fila["Direccion_decimal"]
+    )
 
-            st.dataframe(
-                resultado_barrido,
-                use_container_width=True,
-                hide_index=True
-            )
+    nuevo_metros = int(
+        fila["Metros"]
+    )
 
+    struct.pack_into(
+        "<I",
+        datos_modificados,
+        direccion,
+        nuevo_metros
+    )
 
-            # =================================================
-            # VALORES EXACTOS
-            # =================================================
 
-            exactos = resultado_barrido[
-                resultado_barrido["Valor"] == objetivo
-            ]
+# ============================================================
+# DESCARGAR BIN MODIFICADO
+# ============================================================
 
+st.download_button(
+    label="Descargar BIN modificado",
+    data=bytes(datos_modificados),
+    file_name="EEPROM_MODIFICADO.bin",
+    mime="application/octet-stream"
+)
 
-            st.subheader(
-                f"Valor exacto: {objetivo:,} km"
-            )
 
+# ============================================================
+# RESULTADO FINAL
+# ============================================================
 
-            if exactos.empty:
+st.write(
+    f"Valores km modificados: {len(resultado)}"
+)
 
-                st.warning(
-                    f"No se encontró el valor exacto "
-                    f"{objetivo:,}."
-                )
+st.write(
+    f"Valores metros modificados: {len(df_metros)}"
+)
 
-            else:
-
-                st.success(
-                    f"Se encontraron "
-                    f"{len(exactos)} apariciones exactas."
-                )
-
-                st.dataframe(
-                    exactos,
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-
-            # =================================================
-            # RESUMEN
-            # =================================================
-
-            st.subheader(
-                "Resumen del barrido"
-            )
-
-            resumen = (
-                resultado_barrido[
-                    "Valor"
-                ]
-                .value_counts()
-                .sort_index()
-                .reset_index()
-            )
-
-            resumen.columns = [
-                "Valor",
-                "Cantidad de apariciones"
-            ]
-
-            st.dataframe(
-                resumen,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-        # ====================================================
-        # RESULTADOS METROS
-        # ====================================================
-
-        st.subheader(
-            "📏 Búsqueda de representación en metros"
-        )
-
-        st.write(
-            f"**Kilometraje buscado:** {objetivo:,} km  \n"
-            f"**Equivalente exacto:** {objetivo_metros:,} m  \n"
-            f"**Margen:** ±{margen:,} m  \n"
-            f"**Rango:** {limite_inicio:,} → {limite_fin:,} m"
-        )
-
-
-        if resultado_metros.empty:
-
-            st.warning(
-                "No se encontraron valores dentro del "
-                "margen seleccionado."
-            )
-
-        else:
-
-            # -----------------------------------------------
-            # ORDENAR POR DISTANCIA AL OBJETIVO
-            # -----------------------------------------------
-
-            resultado_metros = (
-                resultado_metros
-                .sort_values(
-                    [
-                        "Distancia absoluta (m)",
-                        "Dirección"
-                    ]
-                )
-                .reset_index(drop=True)
-            )
-
-
-            st.success(
-                f"Se encontraron "
-                f"{len(resultado_metros)} candidatos "
-                f"dentro del rango."
-            )
-
-
-            # -----------------------------------------------
-            # MOSTRAR TABLA
-            # -----------------------------------------------
-
-            st.dataframe(
-                resultado_metros,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-            # =================================================
-            # CANDIDATO MÁS CERCANO
-            # =================================================
-
-            cercano = resultado_metros.iloc[0]
-
-
-            st.info(
-                f"🎯 Candidato más cercano\n\n"
-                f"Objetivo: **{objetivo_metros:,} m**\n\n"
-                f"Encontrado en BIN: "
-                f"**{cercano['Metros']:,} m**\n\n"
-                f"Equivalente: "
-                f"**{cercano['Kilómetros']} km**\n\n"
-                f"Diferencia: "
-                f"**{cercano['Diferencia (m)']:+,} m** "
-                f"(**{cercano['Diferencia (km)']:+.3f} km**)\n\n"
-                f"Dirección: **{cercano['Dirección']}**"
-            )
-
-
-            # =================================================
-            # SI EL CASO ES 282235 → 282334
-            # =================================================
-
-            diferencia_km_cercano = (
-                cercano["Diferencia (m)"] / 1000
-            )
-
-            st.write(
-                f"### Comparación\n"
-                f"Objetivo: **{objetivo:,} km**  \n"
-                f"Candidato: **{cercano['Kilómetros']} km**  \n"
-                f"Diferencia: **{diferencia_km_cercano:+.3f} km**"
-            )
-
-
-        # ====================================================
-        # MODIFICACIÓN DE EQUIVALENTES EN METROS
-        # ====================================================
-
-        st.subheader(
-            "⚠️ Modificación de equivalentes en metros"
-        )
-
-        st.write(
-            f"Valor base nuevo: "
-            f"**{nuevo_km:,} km**"
-        )
-
-        st.write(
-            f"Valor base en metros: "
-            f"**{nuevo_km * 1000:,} m**"
-        )
-
-        st.write(
-            "Las últimas tres cifras serán generadas "
-            "aleatoriamente para cada aparición."
-        )
-
-
-        if not direcciones_metros:
-
-            st.warning(
-                "No hay valores en metros para modificar."
-            )
-
-        else:
-
-            # =================================================
-            # GENERAR SUFIJOS ALEATORIOS
-            # =================================================
-
-            cantidad = len(direcciones_metros)
-
-            if cantidad <= 1000:
-
-                sufijos = random.sample(
-                    range(1000),
-                    cantidad
-                )
-
-            else:
-
-                sufijos = [
-                    random.randint(0, 999)
-                    for _ in range(cantidad)
-                ]
-
-
-            modificaciones = []
-
-
-            # =================================================
-            # REALIZAR REEMPLAZOS
-            # =================================================
-
-            for direccion, sufijo in zip(
-                direcciones_metros,
-                sufijos
-            ):
-
-                valor_anterior = struct.unpack_from(
-                    "<I",
-                    datos_originales,
-                    direccion
-                )[0]
-
-
-                # ---------------------------------------------
-                # NUEVO VALOR
-                # ---------------------------------------------
-
-                nuevo_valor = (
-                    nuevo_km * 1000
-                ) + sufijo
-
-
-                # ---------------------------------------------
-                # UINT32 LITTLE-ENDIAN
-                # ---------------------------------------------
-
-                nuevos_bytes = struct.pack(
-                    "<I",
-                    nuevo_valor
-                )
-
-
-                # ---------------------------------------------
-                # ESCRIBIR
-                # ---------------------------------------------
-
-                datos_modificados[
-                    direccion:direccion + 4
-                ] = nuevos_bytes
-
-
-                modificaciones.append({
-
-                    "Dirección":
-                        f"0x{direccion:04X}",
-
-                    "Valor anterior":
-                        valor_anterior,
-
-                    "HEX anterior":
-                        f"0x{valor_anterior:08X}",
-
-                    "Bytes anteriores":
-                        datos_originales[
-                            direccion:direccion + 4
-                        ].hex(" ").upper(),
-
-                    "Nuevo valor":
-                        nuevo_valor,
-
-                    "Kilómetros":
-                        nuevo_valor / 1000,
-
-                    "Últimas 3 cifras":
-                        f"{sufijo:03d}",
-
-                    "HEX nuevo":
-                        f"0x{nuevo_valor:08X}",
-
-                    "Bytes nuevos":
-                        nuevos_bytes.hex(" ").upper()
-
-                })
-
-
-            resultado_modificaciones = pd.DataFrame(
-                modificaciones
-            )
-
-
-            # =================================================
-            # MOSTRAR MODIFICACIONES
-            # =================================================
-
-            st.success(
-                f"Se modificaron "
-                f"{len(modificaciones)} valores."
-            )
-
-            st.dataframe(
-                resultado_modificaciones,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-            # =================================================
-            # VERIFICACIÓN
-            # =================================================
-
-            st.subheader(
-                "Verificación"
-            )
-
-            errores = 0
-
-            for direccion, sufijo in zip(
-                direcciones_metros,
-                sufijos
-            ):
-
-                valor_esperado = (
-                    nuevo_km * 1000
-                ) + sufijo
-
-                valor_verificado = struct.unpack_from(
-                    "<I",
-                    datos_modificados,
-                    direccion
-                )[0]
-
-                if valor_verificado != valor_esperado:
-
-                    errores += 1
-
-
-            if errores == 0:
-
-                st.success(
-                    "✓ Todos los reemplazos fueron "
-                    "verificados correctamente."
-                )
-
-            else:
-
-                st.error(
-                    f"Se detectaron {errores} errores "
-                    f"durante la verificación."
-                )
-
-
-            # =================================================
-            # NOMBRE DEL ARCHIVO
-            # =================================================
-
-            nombre_original = archivo.name
-
-            if nombre_original.lower().endswith(".bin"):
-
-                nombre_salida = (
-                    nombre_original[:-4]
-                    + "_MODIFICADO.bin"
-                )
-
-            else:
-
-                nombre_salida = (
-                    nombre_original
-                    + "_MODIFICADO.bin"
-                )
-
-
-            # =================================================
-            # DESCARGAR BIN
-            # =================================================
-
-            st.subheader(
-                "Descargar BIN modificado"
-            )
-
-            st.download_button(
-                label="⬇️ Descargar BIN MODIFICADO",
-                data=bytes(datos_modificados),
-                file_name=nombre_salida,
-                mime="application/octet-stream",
-                type="primary"
-            )
-
-
-            # =================================================
-            # DESCARGAR REGISTRO
-            # =================================================
-
-            csv_modificaciones = (
-                resultado_modificaciones
-                .to_csv(index=False)
-                .encode("utf-8")
-            )
-
-            st.download_button(
-                label="⬇️ Descargar registro de modificaciones",
-                data=csv_modificaciones,
-                file_name="registro_modificaciones.csv",
-                mime="text/csv"
-            )
-
+st.write(
+    f"Total de posiciones modificadas: "
+    f"{len(resultado) + len(df_metros)}"
+)
