@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
- st.caption("Concept by Ariel Calacaterra| Develop DAB")
+
 # ============================================================
 # ESTILO UNDERGROUND
 # ============================================================
@@ -103,7 +103,7 @@ st.write(
     "últimas cifras y analiza equivalentes en metros dentro "
     "de todo el archivo BIN."
 )
-
+st.caption("Concept by Ariel Calacaterra | Developed by DAB")
 
 # ============================================================
 # CARGAR ARCHIVO
