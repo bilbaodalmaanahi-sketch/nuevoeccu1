@@ -94,13 +94,13 @@ input {
 # TÍTULO
 # ============================================================
 
-st.title("🐒 MONKY EEPROM LAB")
+st.title("🐒 MONKY EEPROM LAB def")
 
 st.markdown(
     "### ECU / EEPROM Binary Memory Analyzer"
 )
 
-st.caption("Concept by Ariel Calacaterra")
+st.caption("Concept by Ariel Calacaterra | Developed by DAB")
 
 st.write(
     "Busca un valor exacto, realiza un barrido de las "
