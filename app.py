@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import struct
 import pandas as pd
@@ -9,7 +10,7 @@ import random
 # ============================================================
 
 st.set_page_config(
-    page_title="Monky BIN Analyzer by pipi Cabral",
+    page_title="Monky BIN Analyzer",
     page_icon="",
     layout="wide"
 )
@@ -96,7 +97,7 @@ input {
 # TÍTULO
 # ============================================================
 
-st.title("🐒 MONKY BIN ANALYZER by Pipi Cabral")
+st.title("🐒 MONKY BIN ANALYZER ")
 
 st.write(
     "Busca un valor exacto, realiza un barrido de las tres "
@@ -116,13 +117,14 @@ archivo = st.file_uploader(
 
 
 # ============================================================
-# KILOMETRAJE / VALOR A BUSCAR
+# KILOMETRAJE / VALOR EXACTO A BUSCAR
 # ============================================================
 
 ingrekk = st.number_input(
     "Kilometraje / valor exacto a buscar",
     min_value=0,
-    value=234570,
+    value=None,
+    placeholder="Ingrese el kilometraje",
     step=1
 )
 
@@ -134,7 +136,8 @@ ingrekk = st.number_input(
 nuevo_km_input = st.number_input(
     "Nuevo kilometraje fijo",
     min_value=0,
-    value=280000,
+    value=None,
+    placeholder="Ingrese el nuevo kilometraje",
     step=1
 )
 
@@ -142,12 +145,17 @@ nuevo_km_input = st.number_input(
 # ============================================================
 # MARGEN DE METROS
 # ============================================================
+# FIJO: 1.000.000 metros
+# ============================================================
 
-margen = st.number_input(
+margen = 1_000_000
+
+st.number_input(
     "Margen de búsqueda en metros",
     min_value=0,
-    value=1_000_000,
-    step=100_000
+    value=margen,
+    step=100_000,
+    disabled=True
 )
 
 
@@ -167,10 +175,26 @@ buscar = st.button(
 
 if buscar:
 
+    # ========================================================
+    # VALIDACIONES
+    # ========================================================
+
     if archivo is None:
 
         st.warning(
             "Primero debes cargar un archivo BIN."
+        )
+
+    elif ingrekk is None:
+
+        st.warning(
+            "Ingrese el kilometraje / valor exacto a buscar."
+        )
+
+    elif nuevo_km_input is None:
+
+        st.warning(
+            "Ingrese el nuevo kilometraje fijo."
         )
 
     else:
@@ -185,11 +209,17 @@ if buscar:
             datos_originales
         )
 
-        tamaño = len(datos_originales)
+        tamaño = len(
+            datos_originales
+        )
 
-        objetivo = int(ingrekk)
+        objetivo = int(
+            ingrekk
+        )
 
-        nuevo_km = int(nuevo_km_input)
+        nuevo_km = int(
+            nuevo_km_input
+        )
 
 
         # ====================================================
@@ -214,38 +244,43 @@ if buscar:
         )
 
         limite_inicio = (
-            objetivo_metros - int(margen)
+            objetivo_metros - margen
         )
 
         limite_fin = (
-            objetivo_metros + int(margen)
+            objetivo_metros + margen
         )
 
 
         # ====================================================
-        # INFORMACIÓN
+        # INFORMACIÓN DEL ARCHIVO
         # ====================================================
 
         st.success(
             f"Archivo cargado correctamente: {archivo.name}"
         )
 
+
         col1, col2, col3, col4 = st.columns(4)
+
 
         col1.metric(
             "Tamaño BIN",
             f"{tamaño:,} bytes"
         )
 
+
         col2.metric(
             "Valor buscado",
             f"{objetivo:,}"
         )
 
+
         col3.metric(
             "Rango 3 últimas cifras",
             f"{rango_inicio:,} → {rango_fin:,}"
         )
+
 
         col4.metric(
             "Objetivo metros",
@@ -261,10 +296,12 @@ if buscar:
 
         resultados_metros = []
 
-        # Direcciones de valores EXACTOS en KM
+        # Direcciones donde aparece EXACTAMENTE
+        # el kilometraje buscado
         direcciones_km = []
 
-        # Direcciones de valores en metros
+        # Direcciones donde aparece un equivalente
+        # en metros dentro del margen
         direcciones_metros = []
 
 
@@ -283,6 +320,7 @@ if buscar:
                 direccion
             )[0]
 
+
             bytes_valor = (
                 datos_originales[
                     direccion:direccion + 4
@@ -294,7 +332,11 @@ if buscar:
             # BÚSQUEDA DEL RANGO DE KM
             # =================================================
 
-            if rango_inicio <= valor <= rango_fin:
+            if (
+                rango_inicio
+                <= valor
+                <= rango_fin
+            ):
 
                 resultados_barrido.append({
 
@@ -324,7 +366,7 @@ if buscar:
 
 
                 # =============================================
-                # GUARDAR SOLO EL VALOR EXACTO
+                # GUARDAR SOLO LOS VALORES EXACTOS
                 # =============================================
 
                 if valor == objetivo:
@@ -348,6 +390,7 @@ if buscar:
                     valor
                     - objetivo_metros
                 )
+
 
                 resultados_metros.append({
 
@@ -407,12 +450,13 @@ if buscar:
 
 
         # ====================================================
-        # RESULTADOS BARRIDO
+        # RESULTADOS DEL BARRIDO
         # ====================================================
 
         st.subheader(
             "Barrido de las tres últimas cifras"
         )
+
 
         st.write(
             f"Se buscaron todos los valores desde "
@@ -542,7 +586,7 @@ if buscar:
         st.write(
             f"Objetivo: "
             f"**{objetivo_metros:,} metros**  \n"
-            f"Margen: "
+            f"Margen fijo: "
             f"**±{margen:,} metros**  \n"
             f"Rango: "
             f"**{limite_inicio:,} → "
@@ -585,7 +629,7 @@ if buscar:
 
 
             # =================================================
-            # MÁS CERCANO
+            # VALOR MÁS CERCANO
             # =================================================
 
             cercano = (
@@ -618,10 +662,12 @@ if buscar:
             f"**{objetivo:,} km**"
         )
 
+
         st.write(
             f"Nuevo kilometraje: "
             f"**{nuevo_km:,} km**"
         )
+
 
         st.write(
             f"Nuevo valor base en metros: "
@@ -637,9 +683,11 @@ if buscar:
             direcciones_km
         )
 
+
         cantidad_metros = len(
             direcciones_metros
         )
+
 
         total_modificaciones = (
             cantidad_km
@@ -669,7 +717,7 @@ if buscar:
 
 
         # ====================================================
-        # SI NO HAY NADA PARA MODIFICAR
+        # REALIZAR MODIFICACIONES
         # ====================================================
 
         if total_modificaciones == 0:
@@ -686,7 +734,7 @@ if buscar:
 
 
             # =================================================
-            # MODIFICAR VALORES REALES EN KM
+            # MODIFICAR VALORES EXACTOS EN KM
             # =================================================
 
             for direccion in direcciones_km:
@@ -700,37 +748,25 @@ if buscar:
                 )
 
 
-                # ---------------------------------------------
-                # NUEVO VALOR KM
-                # ---------------------------------------------
-
+                # Nuevo valor en KM
                 nuevo_valor = nuevo_km
 
 
-                # ---------------------------------------------
-                # UINT32 LITTLE-ENDIAN
-                # ---------------------------------------------
-
+                # Convertir a UINT32 LITTLE-ENDIAN
                 nuevos_bytes = struct.pack(
                     "<I",
                     nuevo_valor
                 )
 
 
-                # ---------------------------------------------
-                # ESCRIBIR
-                # ---------------------------------------------
-
+                # Escribir en el BIN
                 datos_modificados[
                     direccion:
                     direccion + 4
                 ] = nuevos_bytes
 
 
-                # ---------------------------------------------
-                # REGISTRO
-                # ---------------------------------------------
-
+                # Registrar modificación
                 modificaciones.append({
 
                     "Tipo":
@@ -774,7 +810,7 @@ if buscar:
 
 
             # =================================================
-            # GENERAR SUFIJOS PARA METROS
+            # GENERAR SUFIJOS PARA VALORES EN METROS
             # =================================================
 
             cantidad = len(
@@ -823,39 +859,27 @@ if buscar:
                 )
 
 
-                # ---------------------------------------------
-                # NUEVO VALOR EN METROS
-                # ---------------------------------------------
-
+                # Nuevo valor en metros
                 nuevo_valor = (
                     nuevo_km * 1000
                 ) + sufijo
 
 
-                # ---------------------------------------------
-                # UINT32 LITTLE-ENDIAN
-                # ---------------------------------------------
-
+                # Convertir a UINT32 LITTLE-ENDIAN
                 nuevos_bytes = struct.pack(
                     "<I",
                     nuevo_valor
                 )
 
 
-                # ---------------------------------------------
-                # ESCRIBIR
-                # ---------------------------------------------
-
+                # Escribir en el BIN
                 datos_modificados[
                     direccion:
                     direccion + 4
                 ] = nuevos_bytes
 
 
-                # ---------------------------------------------
-                # REGISTRO
-                # ---------------------------------------------
-
+                # Registrar modificación
                 modificaciones.append({
 
                     "Tipo":
@@ -871,7 +895,10 @@ if buscar:
                         nuevo_valor,
 
                     "Kilómetros":
-                        nuevo_valor / 1000,
+                        round(
+                            nuevo_valor / 1000,
+                            3
+                        ),
 
                     "Últimas 3 cifras":
                         f"{sufijo:03d}",
@@ -899,7 +926,7 @@ if buscar:
 
 
             # =================================================
-            # DATAFRAME MODIFICACIONES
+            # DATAFRAME DE MODIFICACIONES
             # =================================================
 
             resultado_modificaciones = (
@@ -912,6 +939,11 @@ if buscar:
             # =================================================
             # MOSTRAR MODIFICACIONES
             # =================================================
+
+            st.subheader(
+                "Registro de modificaciones"
+            )
+
 
             st.success(
                 f"Se realizaron "
@@ -994,7 +1026,7 @@ if buscar:
 
 
             # =================================================
-            # RESULTADO VERIFICACIÓN
+            # RESULTADO DE VERIFICACIÓN
             # =================================================
 
             if errores == 0:
@@ -1040,7 +1072,7 @@ if buscar:
 
 
             # =================================================
-            # DESCARGAR BIN
+            # DESCARGAR BIN MODIFICADO
             # =================================================
 
             st.subheader(
@@ -1078,5 +1110,6 @@ if buscar:
                 file_name="registro_modificaciones.csv",
                 mime="text/csv"
             )
+```
 
 
